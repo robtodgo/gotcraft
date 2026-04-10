@@ -14,5 +14,13 @@
   "dependencies": {
     "express": "^5.2.1",
     "socket.io": "^4.8.3"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/robtodgo/gotcraft.git"
+  },
+  "bugs": {
+    "url": "https://github.com/robtodgo/gotcraft/issues"
+  },
+  "homepage": "https://github.com/robtodgo/gotcraft#readme"
 }
