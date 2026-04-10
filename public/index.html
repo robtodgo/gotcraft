@@ -9,132 +9,245 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
     body { margin:0; overflow:hidden; font-family:'Press Start 2P', system-ui; background:#000; color:#fff; }
-    button { font-family:'Press Start 2P'; padding:12px 24px; background:#222; color:#fff; border:4px solid #555; cursor:pointer; margin:8px; }
+    .screen { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(0,0,0,0.95); z-index:10; }
+    button { font-family:'Press Start 2P'; padding:15px 30px; margin:10px; background:#222; color:#fff; border:4px solid #555; cursor:pointer; font-size:18px; }
     button:hover { background:#444; }
-    .screen { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(0,0,0,0.9); }
     canvas { display:block; }
-    #hotbar { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); display:flex; gap:4px; background:rgba(0,0,0,0.6); padding:8px; border:4px solid #555; }
-    .slot { width:64px; height:64px; border:3px solid #888; background-size:cover; image-rendering:pixelated; }
-    .slot.selected { border:3px solid #fff; box-shadow:0 0 15px #fff; }
-    #hand { position:absolute; bottom:80px; right:80px; width:180px; height:180px; background:url('https://i.imgur.com/0Z8Z8Z8.png') no-repeat; background-size:contain; pointer-events:none; opacity:0.9; transform:rotate(-25deg); } /* простая рука */
-    #inventory { position:absolute; inset:0; background:rgba(0,0,0,0.85); display:none; flex-direction:column; align-items:center; justify-content:center; }
-    .inv-slot { width:64px; height:64px; border:2px solid #fff; margin:4px; background-size:cover; image-rendering:pixelated; }
+    #version { position:absolute; bottom:10px; right:15px; color:#555; font-size:14px; z-index:100; }
+    #ingame-version { position:absolute; top:15px; right:15px; color:#aaa; font-size:12px; z-index:100; pointer-events:none; }
+    #loading { position:absolute; inset:0; background:rgba(0,0,0,0.9); display:none; flex-direction:column; align-items:center; justify-content:center; font-size:24px; color:#00ff00; }
+    #hotbar { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); display:flex; gap:6px; background:rgba(0,0,0,0.7); padding:10px; border:4px solid #555; }
+    .slot { width:64px; height:64px; border:3px solid #777; background-size:cover; image-rendering:pixelated; }
+    .slot.selected { border-color:#fff; box-shadow:0 0 20px #fff; }
+    #hand { position:absolute; bottom:90px; right:60px; width:220px; height:220px; background:url('https://i.imgur.com/8vN8vN8.png') no-repeat bottom right; background-size:contain; pointer-events:none; opacity:0.85; transform:rotate(-30deg); }
   </style>
 </head>
 <body>
-  <!-- Экраны логин/меню/создание мира — оставлены почти без изменений, только добавлен вызов списка миров -->
 
+  <!-- Версия везде -->
+  <div id="version">GOTCRAFT v1.1.0</div>
+
+  <!-- Логин -->
+  <div id="login-screen" class="screen">
+    <h1 style="font-size:52px; color:#00ff00; margin-bottom:30px;">GOTCRAFT</h1>
+    <input id="username" placeholder="Логин" style="padding:15px; width:380px; margin:10px; font-size:18px;">
+    <input id="password" type="password" placeholder="Пароль" style="padding:15px; width:380px; margin:10px; font-size:18px;">
+    <button onclick="register()">Регистрация</button>
+    <button onclick="login()">Войти</button>
+  </div>
+
+  <!-- Главное меню -->
   <div id="menu-screen" class="screen" style="display:none">
-    <h1 style="font-size:64px;color:#00ff00">GOTCRAFT</h1>
-    <button onclick="showSingleplayer()" style="font-size:24px">ОДИНОЧНАЯ ИГРА</button>
-    <button onclick="showMultiplayer()" style="font-size:24px">СЕТЕВАЯ ИГРА</button>
+    <h1 style="font-size:64px; color:#00ff00;">GOTCRAFT</h1>
+    <button onclick="showSingleplayer()" style="font-size:24px;">ОДИНОЧНАЯ ИГРА</button>
+    <button onclick="showMultiplayer()" style="font-size:24px;">СЕТЕВАЯ ИГРА</button>
+    <div id="version" style="position:static; margin-top:40px; color:#666;">GOTCRAFT v1.1.0</div>
   </div>
 
   <!-- Список миров -->
   <div id="world-list-screen" class="screen" style="display:none">
     <h2>Открытые миры</h2>
-    <div id="world-list"></div>
+    <div id="world-list" style="margin:20px;"></div>
     <button onclick="backToMenu()">Назад</button>
   </div>
 
-  <!-- Игра -->
+  <!-- Создание мира -->
+  <div id="create-world-screen" class="screen" style="display:none">
+    <h2>Создать новый мир</h2>
+    <input id="world-name" placeholder="Название мира" value="Новый мир" style="padding:15px; width:400px; margin:15px;">
+    <select id="gamemode"><option value="creative">Креатив</option><option value="survival">Выживание</option></select>
+    <button onclick="createWorld()">Создать и войти</button>
+    <button onclick="backToMenu()">Назад</button>
+  </div>
+
+  <!-- ИГРА -->
   <div id="game-screen" style="display:none">
     <canvas id="canvas"></canvas>
+    <div id="ingame-version">GOTCRAFT v1.1.0</div>
+    
     <div id="hotbar"></div>
     <div id="hand"></div>
-    <div id="inventory">
-      <h2>Инвентарь (нажми E для закрытия)</h2>
-      <div style="display:flex;flex-wrap:wrap;width:600px;justify-content:center" id="inv-slots"></div>
+
+    <!-- Загрузка -->
+    <div id="loading">
+      <div>Генерация мира...</div>
+      <div style="margin-top:20px; font-size:16px;">Подождите, пожалуйста</div>
     </div>
   </div>
 
   <script>
+    const VERSION = "v1.1.0";
     let socket = io();
-    let currentUser, currentWorldId, isFlying = false, lastSpaceTime = 0;
-    let scene, camera, renderer, playerHeight = 1.8;
+    let currentUser = null;
+    let currentWorldId = null;
+    let scene, camera, renderer;
     let blocks = {};
+    let isFlying = false;
+    let lastSpaceTime = 0;
+    let keys = {};
+    let velocityY = 0;
     let selectedBlockType = 'grass';
     const blockTypes = ['grass', 'dirt', 'stone'];
-    let hotbarSelection = 0;
 
-    // Текстуры Minecraft (публичные ссылки)
     const textures = {
-      grass: 'https://i.imgur.com/5n8n8n8.png',   // замени на реальные если найдешь лучше
-      dirt: 'https://i.imgur.com/9k9k9k9.png',
+      grass: 'https://i.imgur.com/5n8n8n8.png',
+      dirt:  'https://i.imgur.com/9k9k9k9.png',
       stone: 'https://i.imgur.com/2m2m2m2.png'
     };
 
-    // Создаём хотбар
-    function createHotbar() {
-      const hb = document.getElementById('hotbar');
-      hb.innerHTML = '';
-      for (let i = 0; i < 9; i++) {
-        const slot = document.createElement('div');
-        slot.className = `slot ${i===0 ? 'selected' : ''}`;
-        slot.style.backgroundImage = `url(${textures[blockTypes[i % 3]]})`;
-        slot.onclick = () => selectHotbar(i);
-        hb.appendChild(slot);
+    // === Аутентификация ===
+    function register() {
+      const u = document.getElementById('username').value.trim();
+      const p = document.getElementById('password').value.trim();
+      if (!u || !p) return alert("Введите логин и пароль");
+      socket.emit('register', { username: u, password: p });
+    }
+    function login() {
+      const u = document.getElementById('username').value.trim();
+      const p = document.getElementById('password').value.trim();
+      if (!u || !p) return alert("Введите логин и пароль");
+      socket.emit('login', { username: u, password: p });
+    }
+
+    socket.on('auth_success', (data) => {
+      currentUser = data.username;
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('menu-screen').style.display = 'flex';
+    });
+    socket.on('auth_error', (msg) => alert(msg));
+
+    // === Меню ===
+    function showSingleplayer() {
+      document.getElementById('menu-screen').style.display = 'none';
+      document.getElementById('create-world-screen').style.display = 'flex';
+    }
+    function showMultiplayer() {
+      document.getElementById('menu-screen').style.display = 'none';
+      document.getElementById('world-list-screen').style.display = 'flex';
+      socket.emit('get_world_list');
+    }
+    function backToMenu() {
+      document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
+      document.getElementById('menu-screen').style.display = 'flex';
+    }
+
+    // === Создание мира ===
+    function createWorld() {
+      const name = document.getElementById('world-name').value || "Новый мир";
+      socket.emit('create_world', {
+        username: currentUser,
+        name: name,
+        settings: { gamemode: "creative", cheats: true }
+      });
+    }
+
+    socket.on('world_created', (data) => {
+      currentWorldId = data.worldId;
+      document.getElementById('create-world-screen').style.display = 'none';
+      enterGame(data.worldId);
+    });
+
+    socket.on('world_list', (list) => {
+      const container = document.getElementById('world-list');
+      container.innerHTML = '';
+      if (list.length === 0) {
+        container.innerHTML = '<p style="color:#888">Пока нет открытых миров.<br>Создайте первый в Одиночной игре.</p>';
+        return;
       }
+      list.forEach(world => {
+        const btn = document.createElement('button');
+        btn.textContent = `${world.name} — ${world.owner}`;
+        btn.onclick = () => {
+          currentWorldId = world.id;
+          document.getElementById('world-list-screen').style.display = 'none';
+          enterGame(world.id);
+        };
+        container.appendChild(btn);
+      });
+    });
+
+    // === Вход в игру ===
+    function enterGame(worldId) {
+      document.getElementById('game-screen').style.display = 'block';
+      document.getElementById('loading').style.display = 'flex';
+
+      initThreeJS();
+
+      socket.emit('join_world', { worldId });
+
+      socket.on('world_data', (data) => {
+        blocks = data.blocks || {};
+        document.getElementById('loading').style.display = 'none';
+        renderAllBlocks();
+        createHotbar();
+        animate();
+      });
     }
 
-    function selectHotbar(index) {
-      hotbarSelection = index;
-      selectedBlockType = blockTypes[index % 3];
-      document.querySelectorAll('.slot').forEach((s,i) => s.classList.toggle('selected', i===index));
+    // === Three.js инициализация ===
+    function initThreeJS() {
+      const canvas = document.getElementById('canvas');
+      renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x87CEEB);
+
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 12, 15);
+
+      const light = new THREE.DirectionalLight(0xffffff, 1.2);
+      light.position.set(50, 100, 30);
+      scene.add(light);
+      scene.add(new THREE.AmbientLight(0xaaaaaa));
     }
 
-    // Простая рука
-    function updateHand() {
-      const hand = document.getElementById('hand');
-      hand.style.transform = `rotate(${-25 + Math.sin(Date.now()/200)*5}deg)`;
-    }
-
-    // Коллизия (простая)
-    function getBlockAt(x, y, z) {
-      const key = `${Math.floor(x)}_${Math.floor(y)}_${Math.floor(z)}`;
-      return blocks[key];
-    }
-
-    function checkCollision(newPos) {
-      const feetY = Math.floor(newPos.y);
-      const headY = Math.floor(newPos.y + playerHeight);
-      for (let dx = -0.4; dx <= 0.4; dx += 0.8) {
-        for (let dz = -0.4; dz <= 0.4; dz += 0.8) {
-          if (getBlockAt(newPos.x + dx, feetY, newPos.z + dz) || 
-              getBlockAt(newPos.x + dx, headY, newPos.z + dz)) {
-            return true;
-          }
-        }
-      }
-      return false;
-    }
-
-    // Рендер блоков с текстурами
     function renderAllBlocks() {
-      scene.children = scene.children.filter(c => !c.userData.isBlock);
+      // Удаляем старые блоки
+      scene.children = scene.children.filter(child => !child.userData.isBlock);
+
       Object.keys(blocks).forEach(key => {
-        const [x,y,z] = key.split('_').map(Number);
+        const [x, y, z] = key.split('_').map(Number);
         const type = blocks[key];
-        const geometry = new THREE.BoxGeometry(1,1,1);
-        const material = new THREE.MeshLambertMaterial({ 
-          map: new THREE.TextureLoader().load(textures[type] || 'https://i.imgur.com/5n8n8n8.png')
+        const textureUrl = textures[type] || textures.grass;
+
+        const material = new THREE.MeshLambertMaterial({
+          map: new THREE.TextureLoader().load(textureUrl)
         });
-        const mesh = new THREE.Mesh(geometry, material);
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), material);
         mesh.position.set(x, y, z);
         mesh.userData.isBlock = true;
         scene.add(mesh);
       });
     }
 
-    // Движение с коллизией и двойным пробелом
-    let keys = {};
-    let velocityY = 0;
+    function createHotbar() {
+      const hb = document.getElementById('hotbar');
+      hb.innerHTML = '';
+      for (let i = 0; i < 9; i++) {
+        const slot = document.createElement('div');
+        slot.className = `slot ${i === 0 ? 'selected' : ''}`;
+        slot.style.backgroundImage = `url(${textures[blockTypes[i % 3]]})`;
+        slot.onclick = () => selectSlot(i);
+        hb.appendChild(slot);
+      }
+    }
 
+    function selectSlot(index) {
+      selectedBlockType = blockTypes[index % 3];
+      document.querySelectorAll('.slot').forEach((s, i) => {
+        s.classList.toggle('selected', i === index);
+      });
+    }
+
+    // Движение + коллизия + двойной пробел
     function updateMovement() {
-      const speed = 0.25;
-      const forward = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+      if (!camera) return;
+      const speed = 0.3;
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
       forward.y = 0; forward.normalize();
-      const right = new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion);
+      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
       right.y = 0; right.normalize();
 
       let newPos = camera.position.clone();
@@ -144,104 +257,59 @@
       if (keys['a']) newPos.addScaledVector(right, -speed);
       if (keys['d']) newPos.addScaledVector(right, speed);
 
-      // Вертикаль
       if (isFlying) {
-        if (keys[' ']) newPos.y += speed * 1.5;
-        if (keys['shift']) newPos.y -= speed * 1.5;
-        velocityY = 0;
+        if (keys[' ']) newPos.y += speed * 1.6;
+        if (keys['shift']) newPos.y -= speed * 1.6;
       } else {
-        velocityY -= 0.025; // гравитация
+        velocityY -= 0.04;
         newPos.y += velocityY;
       }
 
-      // Коллизия
-      if (!checkCollision(newPos)) {
-        camera.position.copy(newPos);
-      } else if (!isFlying) {
-        velocityY = 0; // приземление
-        // корректируем позицию вверх до тех пор, пока не встанем на блок
-        while (checkCollision(camera.position)) camera.position.y += 0.05;
+      // Простая коллизия
+      if (newPos.y < 2) {
+        newPos.y = 2;
+        velocityY = 0;
       }
+
+      camera.position.copy(newPos);
     }
 
-    // Двойной пробел для полёта
-    document.addEventListener('keydown', e => {
-      keys[e.key.toLowerCase()] = true;
-
-      if (e.key === ' ') {
-        const now = Date.now();
-        if (now - lastSpaceTime < 300) {
-          isFlying = !isFlying;
-          velocityY = 0;
-        }
-        lastSpaceTime = now;
-      }
-
-      if (e.key === 'e' && document.getElementById('game-screen').style.display === 'block') {
-        const inv = document.getElementById('inventory');
-        inv.style.display = inv.style.display === 'flex' ? 'none' : 'flex';
-      }
-
-      if (e.key >= '1' && e.key <= '9') {
-        selectHotbar(parseInt(e.key) - 1);
-      }
-    });
-
-    document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
-
-    // Остальной код Three.js, raycasting, socket и т.д. — оставлен почти таким же, как в предыдущей версии, но с добавлением renderAllBlocks() и updateMovement() в animate().
-
-    // Пример animate loop (добавь/замени):
     function animate() {
       requestAnimationFrame(animate);
       if (document.getElementById('game-screen').style.display === 'block') {
         updateMovement();
-        updateHand();
-        socket.emit('player_move', { position: camera.position, rotation: camera.rotation });
       }
-      renderer.render(scene, camera);
+      if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+      }
     }
 
-    // При создании мира и join_world вызывай createHotbar() и renderAllBlocks()
+    // Управление
+    window.addEventListener('keydown', e => {
+      keys[e.key.toLowerCase()] = true;
 
-    // Для списка миров:
-    function showMultiplayer() {
-      document.getElementById('menu-screen').style.display = 'none';
-      document.getElementById('world-list-screen').style.display = 'flex';
-      socket.emit('get_world_list');
-    }
+      if (e.key === ' ' && document.getElementById('game-screen').style.display === 'block') {
+        const now = Date.now();
+        if (now - lastSpaceTime < 280) isFlying = !isFlying;
+        lastSpaceTime = now;
+      }
 
-    socket.on('world_list', (list) => {
-      const container = document.getElementById('world-list');
-      container.innerHTML = '';
-      list.forEach(w => {
-        const btn = document.createElement('button');
-        btn.textContent = `${w.name} (от ${w.owner})`;
-        btn.onclick = () => {
-          currentWorldId = w.id;
-          document.getElementById('world-list-screen').style.display = 'none';
-          document.getElementById('game-screen').style.display = 'block';
-          socket.emit('join_world', { worldId: w.id });
-          createHotbar();
-        };
-        container.appendChild(btn);
-      });
-      if (list.length === 0) container.innerHTML = '<p>Пока нет открытых миров. Создай первый в одиночной игре.</p>';
+      if (e.key >= '1' && e.key <= '9') selectSlot(parseInt(e.key) - 1);
     });
 
-    // При старте игры (в world_data):
-    socket.on('world_data', (data) => {
-      blocks = data.blocks;
-      renderAllBlocks();
-      createHotbar();
-      // ... остальная инициализация three.js
-      animate();
+    window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+    // Адаптив
+    window.addEventListener('resize', () => {
+      if (camera && renderer) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
     });
 
-    // Блок плейс/брейк — используй selectedBlockType вместо 'grass'
-    // В onMouseDown:
-    // ... при правом клике: socket.emit('block_update', { ..., type: selectedBlockType });
-
+    // Запуск
+    console.log("%cGOTCRAFT " + VERSION + " загружен успешно", "color:#00ff00; font-size:16px");
   </script>
 </body>
 </html>
