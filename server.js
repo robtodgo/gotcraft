@@ -33,7 +33,6 @@ try {
 function saveUsers() { fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2)); }
 function saveWorlds() { fs.writeFileSync(WORLDS_FILE, JSON.stringify(worlds, null, 2)); }
 
-// API
 app.post('/api/register', (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Логин и пароль обязательны' });
@@ -50,7 +49,7 @@ app.post('/api/login', (req, res) => {
   res.json({ success: true });
 });
 
-// Генерация мира (простой шум)
+// Генерация чанка с гарантированным спавном на земле
 function generateChunk(worldId, chunkX, chunkY) {
   const seed = worldId.split('').reduce((a,b)=>a+b.charCodeAt(0),0);
   const blocks = {};
@@ -59,17 +58,25 @@ function generateChunk(worldId, chunkX, chunkY) {
     for (let y = 0; y < size; y++) {
       const wx = chunkX * size + x;
       const wy = chunkY * size + y;
+      // Простой ландшафт: высота земли = 64 + шум
       const noise = Math.sin(wx * 0.1 + seed) * Math.cos(wy * 0.1 + seed) * 5;
       const groundHeight = 64 + Math.floor(noise);
       if (wy < groundHeight - 3) blocks[`${wx},${wy}`] = 'stone';
       else if (wy < groundHeight) blocks[`${wx},${wy}`] = 'dirt';
       else if (wy === groundHeight) blocks[`${wx},${wy}`] = 'grass';
+      // Добавим немного руды
+      if (wy < groundHeight && wy > 20 && Math.random() < 0.02) blocks[`${wx},${wy}`] = 'stone';
+    }
+  }
+  // Гарантируем платформу на спавне (0,64)
+  if (chunkX === 0 && chunkY === 4) { // 4*16=64
+    for (let dx = -2; dx <= 2; dx++) {
+      blocks[`${dx},64`] = 'grass';
     }
   }
   return blocks;
 }
 
-// Активные миры
 const activeWorlds = {};
 Object.entries(worlds).forEach(([id, data]) => {
   activeWorlds[id] = {
@@ -77,7 +84,6 @@ Object.entries(worlds).forEach(([id, data]) => {
     blocks: data.blocks || {},
     players: {},
     chatMessages: data.chatMessages || [],
-    seed: id,
   };
 });
 
@@ -97,7 +103,6 @@ function saveWorldState(worldId) {
   saveWorlds();
 }
 
-// Socket.IO
 io.on('connection', (socket) => {
   console.log('🟢 Подключение:', socket.id);
   let currentUsername = null;
@@ -133,10 +138,10 @@ io.on('connection', (socket) => {
     currentWorldId = worldId;
     world.players[socket.id] = { username: currentUsername, x: 0, y: 70, health: 20, hunger: 20, gamemode: world.settings.gameMode };
 
-    // Отправляем сгенерированные чанки вокруг спавна
+    // Генерируем чанки вокруг спавна
     const nearbyBlocks = {};
-    for (let cx = -2; cx <= 2; cx++) {
-      for (let cy = -2; cy <= 2; cy++) {
+    for (let cx = -3; cx <= 3; cx++) {
+      for (let cy = 2; cy <= 5; cy++) { // y-чанки от 32 до 80 примерно
         Object.assign(nearbyBlocks, generateChunk(worldId, cx, cy));
       }
     }
