@@ -64,7 +64,6 @@ function generateChunk(worldId, chunkX, chunkY) {
       if (wy < groundHeight - 3) blocks[`${wx},${wy}`] = 'stone';
       else if (wy < groundHeight) blocks[`${wx},${wy}`] = 'dirt';
       else if (wy === groundHeight) blocks[`${wx},${wy}`] = 'grass';
-      if (wy > 70 && wy < 80 && Math.random() < 0.01) blocks[`${wx},${wy}`] = 'stone'; // руда
     }
   }
   return blocks;
@@ -133,7 +132,8 @@ io.on('connection', (socket) => {
     socket.join(worldId);
     currentWorldId = worldId;
     world.players[socket.id] = { username: currentUsername, x: 0, y: 70, health: 20, hunger: 20, gamemode: world.settings.gameMode };
-    // Отправляем игроку данные мира
+
+    // Отправляем сгенерированные чанки вокруг спавна
     const nearbyBlocks = {};
     for (let cx = -2; cx <= 2; cx++) {
       for (let cy = -2; cy <= 2; cy++) {
@@ -142,11 +142,12 @@ io.on('connection', (socket) => {
     }
     Object.assign(world.blocks, nearbyBlocks);
     socket.emit('world_data', {
+      worldId: world.id,
+      worldName: world.name,
+      settings: world.settings,
       blocks: nearbyBlocks,
       players: world.players,
       chatMessages: world.chatMessages,
-      worldName: world.name,
-      settings: world.settings,
     });
     socket.to(worldId).emit('player_joined', { id: socket.id, username: currentUsername, x: 0, y: 70 });
     saveWorldState(worldId);
@@ -199,9 +200,6 @@ io.on('connection', (socket) => {
       if (world) {
         delete world.players[socket.id];
         io.to(currentWorldId).emit('player_left', { id: socket.id, username: currentUsername });
-        if (Object.keys(world.players).length === 0) {
-          // Можно удалить пустой мир, но пока оставим
-        }
         saveWorldState(currentWorldId);
       }
     }
