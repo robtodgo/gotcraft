@@ -1,4 +1,4 @@
-// server.js - Gotcraft сервер (Node.js + Express + Socket.IO)
+// server.js (обновлённая версия)
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -11,21 +11,19 @@ const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Хранилища (сохраняются в файлы)
 let users = fs.existsSync('users.json') ? JSON.parse(fs.readFileSync('users.json')) : {};
 let worlds = fs.existsSync('worlds.json') ? JSON.parse(fs.readFileSync('worlds.json')) : {};
 
 const saveUsers = () => fs.writeFileSync('users.json', JSON.stringify(users, null, 2));
 const saveWorlds = () => fs.writeFileSync('worlds.json', JSON.stringify(worlds, null, 2));
 
-// Генерация плоского мира
 function generateInitialBlocks() {
   const blocks = {};
-  for (let x = -20; x <= 20; x++) {
-    for (let z = -20; z <= 20; z++) {
+  for (let x = -25; x <= 25; x++) {
+    for (let z = -25; z <= 25; z++) {
       blocks[`${x}_0_${z}`] = 'grass';
       blocks[`${x}_-1_${z}`] = 'dirt';
-      for (let y = -2; y >= -5; y--) blocks[`${x}_${y}_${z}`] = 'stone';
+      for (let y = -2; y >= -6; y--) blocks[`${x}_${y}_${z}`] = 'stone';
     }
   }
   return blocks;
@@ -34,7 +32,6 @@ function generateInitialBlocks() {
 io.on('connection', (socket) => {
   console.log('Игрок подключился:', socket.id);
 
-  // === Аутентификация ===
   socket.on('register', (data) => {
     if (users[data.username]) return socket.emit('auth_error', 'Пользователь уже существует');
     users[data.username] = { password: data.password };
@@ -50,7 +47,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // === Миры ===
   socket.on('create_world', (data) => {
     const worldId = 'world_' + Date.now();
     worlds[worldId] = {
@@ -58,22 +54,22 @@ io.on('connection', (socket) => {
       owner: data.username,
       settings: data.settings,
       blocks: generateInitialBlocks(),
-      public: false
+      public: true   // теперь все миры публичные для теста
     };
     saveWorlds();
     socket.emit('world_created', { worldId, name: data.name });
   });
 
   socket.on('get_world_list', () => {
-    const list = Object.entries(worlds).map(([id, w]) => ({
-      id, name: w.name, owner: w.owner
-    }));
+    const list = Object.entries(worlds)
+      .filter(([_, w]) => w.public)
+      .map(([id, w]) => ({ id, name: w.name, owner: w.owner }));
     socket.emit('world_list', list);
   });
 
   socket.on('join_world', (data) => {
     const world = worlds[data.worldId];
-    if (!world) return;
+    if (!world) return socket.emit('error', 'Мир не найден');
     socket.join(data.worldId);
     socket.worldId = data.worldId;
     socket.emit('world_data', {
@@ -84,7 +80,7 @@ io.on('connection', (socket) => {
     });
   });
 
-  // === Игровые события ===
+  // Остальные события (player_move, block_update, chat_message) — без изменений из предыдущей версии
   socket.on('player_move', (data) => {
     if (!socket.worldId) return;
     socket.to(socket.worldId).emit('player_moved', {
@@ -114,9 +110,7 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('disconnect', () => {
-    console.log('Игрок отключился:', socket.id);
-  });
+  socket.on('disconnect', () => console.log('Игрок отключился:', socket.id));
 });
 
 const PORT = process.env.PORT || 3000;
