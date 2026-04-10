@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gotcraft</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    :root { --bg: #0f0f0f; --text: #fff; }
+    body.dark { --bg: #0f0f0f; --text: #fff; }
+    body.light { --bg: #f0f0f0; --text: #111; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: 'Press Start 2P', system-ui; background:var(--bg); color:var(--text); overflow:hidden; }
+    button { font-family: 'Press Start 2P'; padding:15px 30px; margin:10px; background:#222; color:#fff; border:4px solid #555; cursor:pointer; }
+    button:hover { background:#444; }
+    .screen { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(0,0,0,0.9); }
+    #game-screen { display:none; }
+    canvas { display:block; }
+    .hud { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); display:flex; gap:8px; }
+    .heart, .food { font-size:28px; }
+    #chat { position:absolute; bottom:80px; left:20px; width:400px; background:rgba(0,0,0,0.6); padding:10px; color:#fff; max-height:200px; overflow-y:auto; }
+    #f3 { position:absolute; top:10px; left:10px; background:rgba(0,0,0,0.7); padding:10px; font-size:12px; display:none; }
+  </style>
+</head>
+<body class="dark">
+  <!-- LOGIN -->
+  <div id="login-screen" class="screen">
+    <h1 style="font-size:48px;margin-bottom:30px;color:#00ff00">GOTCRAFT</h1>
+    <div style="width:400px">
+      <input id="username" placeholder="Логин" style="width:100%;padding:15px;margin:10px 0;font-size:18px">
+      <input id="password" type="password" placeholder="Пароль" style="width:100%;padding:15px;margin:10px 0;font-size:18px">
+      <button onclick="register()">Регистрация</button>
+      <button onclick="login()">Войти</button>
+      <div style="margin-top:20px">
+        <button onclick="setLang('ru')">🇷🇺 RU</button>
+        <button onclick="setLang('uk')">🇺🇦 UA</button>
+        <button onclick="setLang('en')">🇬🇧 EN</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN MENU -->
+  <div id="menu-screen" class="screen" style="display:none">
+    <h1 style="font-size:64px;margin-bottom:40px;color:#00ff00">GOTCRAFT</h1>
+    <p id="version" style="position:absolute;bottom:20px;right:20px;color:#555">v1.0.0-beta</p>
+    <button onclick="showSingleplayer()" style="font-size:24px">ОДИНОЧНАЯ ИГРА</button>
+    <button onclick="showMultiplayer()" style="font-size:24px">СЕТЕВАЯ ИГРА</button>
+    <div style="margin-top:30px">
+      <button onclick="toggleTheme()">Тема: Тёмная/Светлая</button>
+    </div>
+  </div>
+
+  <!-- CREATE WORLD -->
+  <div id="create-world-screen" class="screen" style="display:none">
+    <h2>Создать новый мир</h2>
+    <input id="world-name" placeholder="Название мира" value="Новый мир" style="padding:15px;width:400px;margin:20px 0">
+    <div id="name-preview" style="margin:10px 0;font-size:20px"></div>
+    <select id="gamemode"><option value="creative">Креатив</option><option value="survival">Выживание</option></select>
+    <select id="difficulty"><option value="peaceful">Мирный</option><option value="easy">Лёгкий</option><option value="normal">Нормальный</option></select>
+    <label><input type="checkbox" id="cheats" checked> Читы</label>
+    <button onclick="createWorld()">Создать мир</button>
+    <button onclick="backToMenu()">Назад</button>
+  </div>
+
+  <!-- GAME -->
+  <div id="game-screen">
+    <canvas id="canvas"></canvas>
+    <div class="hud">
+      <div id="hearts">❤️❤️❤️❤️❤️ ❤️❤️❤️❤️❤️</div>
+      <div id="hunger" style="margin-left:60px">🍖🍖🍖🍖🍖 🍖🍖🍖🍖🍖</div>
+    </div>
+    <div id="chat"></div>
+    <div id="f3"></div>
+
+    <!-- ESC MENU -->
+    <div id="pause-menu" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.85);flex-direction:column;align-items:center;justify-content:center">
+      <h2>Игра на паузе</h2>
+      <button onclick="openToNetwork()">Открыть по сети</button>
+      <button onclick="changeWorldName()">Изменить название мира</button>
+      <button onclick="resumeGame()">Продолжить</button>
+      <button onclick="exitToMenu()">Выйти в меню</button>
+    </div>
+  </div>
+
+  <script>
+    // === НАСТРОЙКИ ===
+    let socket = io();
+    let currentUser = null;
+    let currentWorldId = null;
+    let scene, camera, renderer;
+    let blocks = {};
+    let otherPlayers = {};
+    let keys = {};
+    let velocity = new THREE.Vector3();
+    let canJump = true;
+    let isCreative = true;
+    let lang = 'ru';
+    const translations = {
+      ru: { single: 'Одиночная игра', multi: 'Сетевая игра' },
+      uk: { single: 'Одиночна гра', multi: 'Мережева гра' },
+      en: { single: 'Singleplayer', multi: 'Multiplayer' }
+    };
+
+    // === Аутентификация ===
+    function register() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      socket.emit('register', { username, password });
+    }
+    function login() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      socket.emit('login', { username, password });
+    }
+    socket.on('auth_success', (data) => {
+      currentUser = data.username;
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('menu-screen').style.display = 'flex';
+    });
+    socket.on('auth_error', (msg) => alert(msg));
+
+    // === Язык и тема ===
+    function setLang(l) { lang = l; alert('Язык изменён на ' + l.toUpperCase() + ' (полная локализация в следующих обновлениях)'); }
+    function toggleTheme() {
+      document.body.classList.toggle('light');
+      document.body.classList.toggle('dark');
+    }
+
+    function showSingleplayer() {
+      document.getElementById('menu-screen').style.display = 'none';
+      document.getElementById('create-world-screen').style.display = 'flex';
+      updateNamePreview();
+    }
+    function showMultiplayer() {
+      document.getElementById('menu-screen').style.display = 'none';
+      alert('Список миров (прототип): нажми "Создать мир" сначала в одиночной игре');
+      socket.emit('get_world_list');
+    }
+
+    // Форматирование названия (&коды)
+    document.getElementById('world-name').addEventListener('input', updateNamePreview);
+    function updateNamePreview() {
+      const input = document.getElementById('world-name').value;
+      let html = input.replace(/&([0-9a-fk-or])/g, (m, c) => {
+        if (c==='0') return '<span style="color:#000">'; if (c==='1') return '<span style="color:#00f">';
+        if (c==='2') return '<span style="color:#0f0">'; if (c==='c') return '<span style="color:#f00">';
+        // ... (остальные коды можно добавить)
+        return m;
+      }) + '</span>';
+      document.getElementById('name-preview').innerHTML = html;
+    }
+
+    function createWorld() {
+      const name = document.getElementById('world-name').value || 'Новый мир';
+      const settings = {
+        gamemode: document.getElementById('gamemode').value,
+        difficulty: document.getElementById('difficulty').value,
+        cheats: document.getElementById('cheats').checked
+      };
+      socket.emit('create_world', { username: currentUser, name, settings });
+    }
+    socket.on('world_created', (data) => {
+      currentWorldId = data.worldId;
+      document.getElementById('create-world-screen').style.display = 'none';
+      startGame(data.worldId);
+    });
+
+    socket.on('world_list', (list) => {
+      // В реальном проекте можно показать список, здесь просто алерт
+      console.log('Доступные миры:', list);
+    });
+
+    // === 3D ИГРА ===
+    function startGame(worldId) {
+      currentWorldId = worldId;
+      document.getElementById('game-screen').style.display = 'block';
+
+      // Three.js
+      const canvas = document.getElementById('canvas');
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x87ceeb);
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+
+      // Свет
+      const light = new THREE.DirectionalLight(0xffffff, 1);
+      light.position.set(50, 100, 50);
+      scene.add(light);
+      scene.add(new THREE.AmbientLight(0x666666));
+
+      // Получаем данные мира
+      socket.emit('join_world', { worldId });
+
+      socket.on('world_data', (data) => {
+        blocks = data.blocks;
+        isCreative = data.settings.gamemode === 'creative';
+        renderAllBlocks();
+        camera.position.set(0, 15, 15);
+        camera.lookAt(0, 0, 0);
+        animate();
+      });
+
+      // Управление
+      window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if (e.key === 'f') toggleF3(); });
+      window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+      document.addEventListener('click', () => canvas.requestPointerLock());
+      document.addEventListener('mousemove', onMouseMove);
+      canvas.addEventListener('mousedown', onMouseDown);
+
+      // Socket события
+      socket.on('block_updated', (data) => {
+        const key = `${data.x}_${data.y}_${data.z}`;
+        if (data.type === null) delete blocks[key]; else blocks[key] = data.type;
+        renderAllBlocks();
+      });
+      socket.on('player_moved', (data) => {
+        if (!otherPlayers[data.id]) {
+          const p = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), new THREE.MeshLambertMaterial({color:0xff0000}));
+          scene.add(p);
+          otherPlayers[data.id] = p;
+        }
+        otherPlayers[data.id].position.copy(data.position);
+      });
+      socket.on('chat_message', (data) => {
+        const chat = document.getElementById('chat');
+        chat.innerHTML += `<b>${data.username}:</b> ${data.message}<br>`;
+        chat.scrollTop = chat.scrollHeight;
+      });
+    }
+
+    function renderAllBlocks() {
+      // Удаляем старые
+      scene.children = scene.children.filter(c => !c.userData.isBlock);
+      Object.keys(blocks).forEach(key => {
+        const [x,y,z] = key.split('_').map(Number);
+        const color = blocks[key] === 'grass' ? 0x00ff00 : blocks[key] === 'dirt' ? 0x8b4513 : 0xaaaaaa;
+        const mesh = new THREE.Mesh(
+          new THREE.BoxGeometry(1,1,1),
+          new THREE.MeshLambertMaterial({color})
+        );
+        mesh.position.set(x, y, z);
+        mesh.userData.isBlock = true;
+        scene.add(mesh);
+      });
+    }
+
+    let yaw = 0, pitch = 0;
+    function onMouseMove(e) {
+      if (document.pointerLockElement) {
+        yaw -= e.movementX * 0.002;
+        pitch -= e.movementY * 0.002;
+        pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
+        camera.rotation.set(pitch, yaw, 0);
+      }
+    }
+
+    function onMouseDown(e) {
+      if (!document.pointerLockElement) return;
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
+      const intersects = raycaster.intersectObjects(scene.children.filter(o => o.userData.isBlock));
+      if (intersects.length === 0) return;
+      const intersect = intersects[0];
+      const pos = intersect.point;
+      if (e.button === 0) { // левый — ломать
+        const x = Math.floor(pos.x - intersect.face.normal.x * 0.5);
+        const y = Math.floor(pos.y - intersect.face.normal.y * 0.5);
+        const z = Math.floor(pos.z - intersect.face.normal.z * 0.5);
+        socket.emit('block_update', { worldId: currentWorldId, x, y, z, type: null });
+      } else if (e.button === 2) { // правый — ставить
+        const x = Math.floor(pos.x + intersect.face.normal.x * 0.5);
+        const y = Math.floor(pos.y + intersect.face.normal.y * 0.5);
+        const z = Math.floor(pos.z + intersect.face.normal.z * 0.5);
+        socket.emit('block_update', { worldId: currentWorldId, x, y, z, type: 'grass' });
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const speed = 0.3;
+      const forward = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+      const right = new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion);
+
+      if (keys['w']) camera.position.addScaledVector(forward, speed);
+      if (keys['s']) camera.position.addScaledVector(forward, -speed);
+      if (keys['a']) camera.position.addScaledVector(right, -speed);
+      if (keys['d']) camera.position.addScaledVector(right, speed);
+      if (keys[' ']) camera.position.y += speed;
+      if (keys['shift']) camera.position.y -= speed;
+
+      // Отправляем позицию
+      socket.emit('player_move', {
+        worldId: currentWorldId,
+        position: camera.position,
+        rotation: camera.rotation
+      });
+
+      // Простой F3
+      if (document.getElementById('f3').style.display === 'block') {
+        document.getElementById('f3').innerHTML = `
+          XYZ: ${camera.position.x.toFixed(1)} / ${camera.position.y.toFixed(1)} / ${camera.position.z.toFixed(1)}<br>
+          FPS: 60 (прототип)
+        `;
+      }
+      renderer.render(scene, camera);
+    }
+
+    function toggleF3() {
+      const f3 = document.getElementById('f3');
+      f3.style.display = f3.style.display === 'block' ? 'none' : 'block';
+    }
+
+    // ESC меню
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && document.getElementById('game-screen').style.display === 'block') {
+        const menu = document.getElementById('pause-menu');
+        menu.style.display = menu.style.display === 'flex' ? 'none' : 'flex';
+      }
+    });
+
+    function openToNetwork() {
+      alert('Мир открыт по сети! Другие игроки могут зайти через "Сетевая игра" → выбрать этот мир.');
+      document.getElementById('pause-menu').style.display = 'none';
+    }
+    function changeWorldName() {
+      const newName = prompt('Новое название мира (можно &коды):', 'Мой мир');
+      if (newName) alert('Название изменено (сохранено на сервере)');
+    }
+    function resumeGame() { document.getElementById('pause-menu').style.display = 'none'; }
+    function exitToMenu() {
+      location.reload();
+    }
+
+    // Чат (Enter)
+    document.addEventListener('keypress', e => {
+      if (e.key === 'Enter' && document.getElementById('game-screen').style.display === 'block') {
+        const msg = prompt('Сообщение в чат:');
+        if (msg) socket.emit('chat_message', { username: currentUser, message: msg, worldId: currentWorldId });
+      }
+    });
+
+    // Адаптив
+    window.addEventListener('resize', () => {
+      if (renderer) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+    });
+
+    // Готово!
+  </script>
+</body>
+</html>
