@@ -3,626 +3,296 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Gotcraft v0.2.0</title>
+  <title>Gotcraft v0.3.0</title>
   <style>
-    @font-face {
-      font-family: 'Minecraft';
-      src: url('https://db.onlinewebfonts.com/t/6ab539c6fc2b21ff0b149b3d06d7f97c.woff2') format('woff2');
-      font-weight: normal;
-      font-style: normal;
-    }
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: 'Minecraft', 'Courier New', monospace;
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
-    }
-    body {
-      background: #0d0d0d;
-      background-image: url('data:image/svg+xml,%3Csvg width="64" height="64" xmlns="http://www.w3.org/2000/svg"%3E%3Cdefs%3E%3Cpattern id="grass" patternUnits="userSpaceOnUse" width="32" height="32"%3E%3Crect width="32" height="32" fill="%232d5a1e"/%3E%3Crect x="2" y="2" width="12" height="12" fill="%23397d24"/%3E%3Crect x="18" y="2" width="12" height="12" fill="%23397d24"/%3E%3Crect x="2" y="18" width="12" height="12" fill="%23397d24"/%3E%3Crect x="18" y="18" width="12" height="12" fill="%23397d24"/%3E%3C/pattern%3E%3C/defs%3E%3Crect width="100%25" height="100%25" fill="url(%23grass)"/%3E%3C/svg%3E');
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-    }
-    #app {
-      width: 100%;
-      max-width: 1280px;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      background: rgba(0, 0, 0, 0.75);
-      box-shadow: 0 0 0 4px #2d2d2d, 0 0 0 8px #1a1a1a;
-      border-radius: 0;
-      overflow: hidden;
-      position: relative;
-    }
-    /* Minecraft-стиль панелей */
-    .panel {
-      background: #1e1e1e;
-      border: 4px solid #3b3b3b;
-      box-shadow: inset 0 0 0 2px #0f0f0f, 0 6px 0 #0a0a0a;
-      padding: 20px;
-      color: #e0e0e0;
-      text-shadow: 2px 2px #0a0a0a;
-    }
-    button {
-      background: #3c3c3c;
-      border: 3px solid #1f1f1f;
-      border-bottom: 6px solid #0f0f0f;
-      color: white;
-      padding: 12px 24px;
-      font-size: 18px;
-      cursor: pointer;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      box-shadow: inset 0 0 0 2px #5a5a5a;
-      transition: 0.05s linear;
-      margin: 8px;
-      font-family: 'Minecraft', monospace;
-    }
-    button:hover {
-      background: #4a7a3a;
-      border-bottom-width: 4px;
-      transform: translateY(2px);
-      box-shadow: inset 0 0 0 2px #8bc34a;
-    }
-    button:active {
-      border-bottom-width: 2px;
-      transform: translateY(4px);
-    }
-    input, select {
-      background: #0f0f0f;
-      border: 3px solid #2d2d2d;
-      border-bottom: 6px solid #1a1a1a;
-      color: #ffffff;
-      padding: 12px;
-      font-size: 16px;
-      font-family: 'Minecraft', monospace;
-      margin: 8px 0;
-      width: 100%;
-      box-shadow: inset 0 0 8px #000000;
-    }
-    input:focus, select:focus {
-      outline: none;
-      border-color: #5b8c4e;
-    }
-    h1, h2, h3 {
-      color: #8bc34a;
-      text-shadow: 4px 4px #1a3b0e;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-    }
-    /* Игровой канвас */
-    #gameCanvas {
-      display: block;
-      width: 100%;
-      height: 100%;
-      background: #6b8cff;
-      image-rendering: crisp-edges;
-      image-rendering: pixelated;
-    }
-    #hud {
-      position: absolute;
-      bottom: 10px;
-      left: 10px;
-      right: 10px;
-      display: flex;
-      justify-content: space-between;
-      pointer-events: none;
-      color: white;
-      text-shadow: 2px 2px #1a1a1a;
-      font-size: 20px;
-    }
-    #hotbar {
-      display: flex;
-      gap: 4px;
-      background: rgba(20,20,20,0.8);
-      padding: 8px;
-      border: 3px solid #2d2d2d;
-    }
-    .slot {
-      width: 48px;
-      height: 48px;
-      background: #8b8b8b;
-      border: 3px solid #2d2d2d;
-      border-bottom: 6px solid #151515;
-      box-shadow: inset 0 0 0 2px #b9b9b9;
-    }
-    .slot.selected {
-      border-color: #8bc34a;
-      box-shadow: inset 0 0 0 3px #a5d6a5;
-    }
-    #debugInfo {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      background: rgba(0,0,0,0.7);
-      color: #aaffaa;
-      padding: 8px;
-      font-family: monospace;
-      border: 2px solid #3a7a2a;
-      display: none;
-    }
-    #chatBox {
-      position: absolute;
-      bottom: 100px;
-      left: 10px;
-      width: 400px;
-      max-height: 200px;
-      overflow-y: auto;
-      background: rgba(0,0,0,0.6);
-      color: white;
-      padding: 8px;
-      border: 3px solid #2d2d2d;
-      font-size: 14px;
-      pointer-events: none;
-    }
-    .modal {
-      position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.85);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-    }
-    .modal-content {
-      background: #1e1e1e;
-      border: 6px solid #2d2d2d;
-      box-shadow: inset 0 0 0 3px #0a0a0a, 0 10px 0 #0f0f0f;
-      padding: 32px;
-      max-width: 500px;
-      width: 90%;
-      color: #e0e0e0;
-    }
-    .green-text {
-      color: #8bc34a;
-    }
+    @font-face { font-family: 'Minecraft'; src: url('https://db.onlinewebfonts.com/t/6ab539c6fc2b21ff0b149b3d06d7f97c.woff2') format('woff2'); }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Minecraft', monospace; image-rendering: pixelated; }
+    body { background: #0d0d0d; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    #app { width: 100%; max-width: 1280px; height: 100vh; display: flex; flex-direction: column; background: #1a1a1a; box-shadow: 0 0 0 4px #2d2d2d; overflow: hidden; position: relative; }
+    .panel { background: #1e1e1e; border: 4px solid #3b3b3b; box-shadow: inset 0 0 0 2px #0f0f0f, 0 6px 0 #0a0a0a; padding: 20px; color: #e0e0e0; }
+    button { background: #3c3c3c; border: 3px solid #1f1f1f; border-bottom: 6px solid #0f0f0f; color: white; padding: 12px 24px; font-size: 18px; cursor: pointer; text-transform: uppercase; box-shadow: inset 0 0 0 2px #5a5a5a; transition: 0.05s; margin: 8px; }
+    button:hover { background: #4a7a3a; border-bottom-width: 4px; transform: translateY(2px); }
+    input, select { background: #0f0f0f; border: 3px solid #2d2d2d; border-bottom: 6px solid #1a1a1a; color: white; padding: 12px; font-size: 16px; margin: 8px 0; width: 100%; }
+    h1, h2 { color: #8bc34a; text-shadow: 4px 4px #1a3b0e; }
+    #gameCanvas { display: block; width: 100%; height: 100%; background: #6b8cff; }
+    #hud { position: absolute; bottom: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; pointer-events: none; color: white; text-shadow: 2px 2px #1a1a1a; font-size: 20px; }
+    #hotbar { display: flex; gap: 4px; background: rgba(20,20,20,0.8); padding: 8px; border: 3px solid #2d2d2d; }
+    .slot { width: 48px; height: 48px; background: #8b8b8b; border: 3px solid #2d2d2d; border-bottom: 6px solid #151515; }
+    .slot.selected { border-color: #8bc34a; }
+    #debugInfo { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); color: #aaffaa; padding: 8px; border: 2px solid #3a7a2a; display: none; }
+    #chatBox { position: absolute; bottom: 100px; left: 10px; width: 400px; max-height: 200px; overflow-y: auto; background: rgba(0,0,0,0.6); color: white; padding: 8px; border: 3px solid #2d2d2d; font-size: 14px; pointer-events: none; }
+    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+    .modal-content { background: #1e1e1e; border: 6px solid #2d2d2d; box-shadow: inset 0 0 0 3px #0a0a0a, 0 10px 0 #0f0f0f; padding: 32px; max-width: 500px; width: 90%; }
   </style>
 </head>
 <body>
 <div id="app">
-  <!-- Экран входа/регистрации -->
   <div id="authScreen" class="modal" style="display: flex;">
     <div class="modal-content">
-      <h1 style="text-align:center; font-size:48px;">GOTCRAFT</h1>
-      <div style="text-align:center; margin-bottom:20px;">v0.2.0</div>
-      <input type="text" id="username" placeholder="Логин" autocomplete="off">
+      <h1 style="font-size:48px;">GOTCRAFT</h1>
+      <div style="margin-bottom:20px;">v0.3.0</div>
+      <input type="text" id="username" placeholder="Логин">
       <input type="password" id="password" placeholder="Пароль">
       <div style="display:flex; gap:10px; justify-content:center;">
         <button id="loginBtn">Войти</button>
         <button id="registerBtn">Регистрация</button>
       </div>
-      <div id="authError" style="color:#ff5555; margin-top:15px; text-align:center;"></div>
+      <div id="authError" style="color:#ff5555; margin-top:15px;"></div>
     </div>
   </div>
-
-  <!-- Главное меню -->
   <div id="mainMenu" style="display:none; flex-direction:column; align-items:center; justify-content:center; height:100%;">
-    <h1 style="font-size:72px; margin-bottom:20px;">GOTCRAFT</h1>
-    <div style="margin-bottom:30px; color:#8bc34a;">Выживай, строй, исследуй</div>
+    <h1 style="font-size:72px;">GOTCRAFT</h1>
     <button id="singleplayerBtn" style="min-width:300px;">Одиночная игра</button>
     <button id="multiplayerBtn" style="min-width:300px;">Сетевая игра</button>
     <button id="settingsBtn" style="min-width:300px;">Настройки</button>
     <div style="margin-top:30px;">Игрок: <span id="displayUsername" class="green-text"></span></div>
   </div>
-
-  <!-- Экран создания мира -->
   <div id="createWorldScreen" style="display:none; padding:30px; overflow-y:auto;">
     <div class="panel">
       <h2>Создание мира</h2>
-      <label>Название мира:</label>
-      <input type="text" id="worldNameInput" value="Новый мир" placeholder="Используйте &k, &l, &n...">
-      <label>Режим игры:</label>
-      <select id="gameModeSelect">
-        <option value="survival">Выживание</option>
-        <option value="creative">Креатив</option>
-      </select>
+      <label>Название:</label>
+      <input type="text" id="worldNameInput" value="Новый мир" placeholder="&aЦвет &lЖирный">
+      <label>Режим:</label>
+      <select id="gameModeSelect"><option value="survival">Выживание</option><option value="creative">Креатив</option></select>
       <label>Сложность:</label>
-      <select id="difficultySelect">
-        <option value="peaceful">Мирная</option>
-        <option value="easy">Лёгкая</option>
-        <option value="normal" selected>Нормальная</option>
-        <option value="hard">Сложная</option>
-      </select>
-      <label><input type="checkbox" id="cheatsCheckbox"> Читы (команды)</label>
-      <label>Тип мира:</label>
-      <select id="generationSelect">
-        <option value="default">Обычный</option>
-        <option value="flat">Плоский</option>
-      </select>
+      <select id="difficultySelect"><option value="peaceful">Мирная</option><option value="easy">Лёгкая</option><option value="normal" selected>Нормальная</option><option value="hard">Сложная</option></select>
+      <label><input type="checkbox" id="cheatsCheckbox"> Читы</label>
       <div style="display:flex; gap:10px; margin-top:20px;">
         <button id="createWorldConfirm">Создать</button>
         <button id="backToMenuFromCreate">Назад</button>
       </div>
     </div>
   </div>
-
-  <!-- Экран сетевой игры -->
   <div id="multiplayerScreen" style="display:none; padding:30px;">
     <div class="panel">
       <h2>Сетевая игра</h2>
       <div id="worldsList" style="margin:20px 0; max-height:300px; overflow-y:auto;"></div>
-      <button id="refreshWorlds">Обновить список</button>
+      <button id="refreshWorlds">Обновить</button>
       <button id="backToMenuFromMulti">Назад</button>
     </div>
   </div>
-
-  <!-- Игровой экран -->
   <div id="gameScreen" style="display:none; position:relative; width:100%; height:100%;">
     <canvas id="gameCanvas"></canvas>
     <div id="hud">
       <div>❤️ <span id="healthDisplay">20</span> 🍗 <span id="hungerDisplay">20</span></div>
-      <div id="hotbar">
-        <div class="slot selected"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div>
-        <div class="slot"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div>
-      </div>
+      <div id="hotbar"><div class="slot selected"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div></div>
     </div>
     <div id="debugInfo"></div>
     <div id="chatBox"></div>
-    <input type="text" id="chatInput" style="position:absolute; bottom:10px; left:10px; width:400px; display:none;" placeholder="Напишите сообщение...">
-    <!-- Меню паузы -->
+    <input type="text" id="chatInput" style="position:absolute; bottom:10px; left:10px; width:400px; display:none;" placeholder="Сообщение...">
     <div id="pauseMenu" class="modal-content" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:300px;">
-      <h3>Меню</h3>
-      <button id="resumeBtn" style="width:100%;">Вернуться в игру</button>
-      <button id="openToLanBtn" style="width:100%;">Открыть по сети</button>
-      <button id="saveAndQuitBtn" style="width:100%;">Сохранить и выйти</button>
+      <h3>Пауза</h3>
+      <button id="resumeBtn">Продолжить</button>
+      <button id="openToLanBtn">Открыть по сети</button>
+      <button id="saveAndQuitBtn">Выйти</button>
     </div>
   </div>
-
-  <!-- Настройки -->
   <div id="settingsScreen" style="display:none; padding:30px;">
     <div class="panel">
       <h2>Настройки</h2>
       <label>Язык:</label>
-      <select id="languageSelect">
-        <option value="ru">Русский</option>
-        <option value="uk">Українська</option>
-        <option value="en">English</option>
-      </select>
-      <label>Тема (всегда тёмно-зелёная):</label>
-      <select id="themeSelect" disabled>
-        <option value="dark">Minecraft</option>
-      </select>
+      <select id="languageSelect"><option value="ru">Русский</option><option value="uk">Українська</option><option value="en">English</option></select>
       <button id="backFromSettings">Назад</button>
     </div>
   </div>
 </div>
-
 <script src="/socket.io/socket.io.js"></script>
 <script>
   (function(){
     "use strict";
+    // ---------- Форматирование &-кодов ----------
+    function formatMinecraftText(text) {
+      if (!text) return '';
+      const map = {'0':'#000000','1':'#0000AA','2':'#00AA00','3':'#00AAAA','4':'#AA0000','5':'#AA00AA','6':'#FFAA00','7':'#AAAAAA','8':'#555555','9':'#5555FF','a':'#55FF55','b':'#55FFFF','c':'#FF5555','d':'#FF55FF','e':'#FFFF55','f':'#FFFFFF'};
+      let result = '';
+      let styles = { color: '#FFFFFF', bold: false, italic: false, underline: false, obfuscated: false };
+      let i = 0;
+      while (i < text.length) {
+        if (text[i] === '&' && i+1 < text.length) {
+          const code = text[i+1].toLowerCase();
+          if (code === 'r') { styles = { color: '#FFFFFF', bold: false, italic: false, underline: false, obfuscated: false }; }
+          else if (code === 'l') styles.bold = true;
+          else if (code === 'o') styles.italic = true;
+          else if (code === 'n') styles.underline = true;
+          else if (code === 'm') styles.strikethrough = true;
+          else if (code === 'k') styles.obfuscated = true;
+          else if (map[code]) styles.color = map[code];
+          i += 2;
+        } else {
+          let span = document.createElement('span');
+          span.style.color = styles.color;
+          if (styles.bold) span.style.fontWeight = 'bold';
+          if (styles.italic) span.style.fontStyle = 'italic';
+          if (styles.underline) span.style.textDecoration = 'underline';
+          if (styles.obfuscated) span.style.textDecoration = 'line-through';
+          span.textContent = text[i];
+          result += span.outerHTML;
+          i++;
+        }
+      }
+      return result;
+    }
 
-    // ---------- Глобальные переменные ----------
-    let socket;
-    let currentUser = null;
-    let currentWorld = null;
-    let players = {};
-    let worldBlocks = {};
-    let canvas, ctx;
-    let gameLoopInterval;
+    // Глобальные переменные
+    let socket, currentUser, currentWorld, players = {}, worldBlocks = {}, chatMessages = [];
+    let canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
     let keys = {};
-    let player = { x: 0, y: 70, vx: 0, vy: 0, onGround: false, health: 20, hunger: 20, gameMode: 'survival' };
-    let showDebug = false;
-    let showHitboxes = false;
-    let chatMessages = [];
-    let chatOpen = false;
-    let paused = false;
+    let player = { x: 0, y: 70, vx: 0, vy: 0, onGround: false, health: 20, hunger: 20, gamemode: 'survival' };
+    let showDebug = false, paused = false, chatOpen = false;
+    const tileSize = 32;
+    let cameraX = 0, cameraY = 0;
 
-    // DOM элементы
-    const authScreen = document.getElementById('authScreen');
-    const mainMenu = document.getElementById('mainMenu');
-    const createWorldScreen = document.getElementById('createWorldScreen');
-    const multiplayerScreen = document.getElementById('multiplayerScreen');
-    const gameScreen = document.getElementById('gameScreen');
-    const settingsScreen = document.getElementById('settingsScreen');
-    const pauseMenu = document.getElementById('pauseMenu');
-    const debugInfo = document.getElementById('debugInfo');
-    const chatBox = document.getElementById('chatBox');
-    const chatInput = document.getElementById('chatInput');
-    const canvasElem = document.getElementById('gameCanvas');
-    canvas = canvasElem;
-    ctx = canvas.getContext('2d');
+    // UI элементы
+    const authScreen = document.getElementById('authScreen'), mainMenu = document.getElementById('mainMenu');
+    const createWorldScreen = document.getElementById('createWorldScreen'), multiplayerScreen = document.getElementById('multiplayerScreen');
+    const gameScreen = document.getElementById('gameScreen'), pauseMenu = document.getElementById('pauseMenu');
+    const chatBox = document.getElementById('chatBox'), chatInput = document.getElementById('chatInput'), debugInfo = document.getElementById('debugInfo');
     const authError = document.getElementById('authError');
 
-    // Функция отображения ошибок
-    function showError(msg) {
-      authError.textContent = msg;
-      setTimeout(() => authError.textContent = '', 3000);
-    }
-
-    // ---------- Socket.IO ----------
-    function connectSocket() {
-      socket = io();
-      socket.on('connect', () => console.log('Socket connected'));
-      socket.on('auth_success', ({ username }) => {
-        currentUser = username;
-        document.getElementById('displayUsername').textContent = username;
-        showMainMenu();
-      });
-      socket.on('auth_error', (msg) => showError(msg));
-      socket.on('worlds_list', (list) => renderWorldsList(list));
-      socket.on('world_created', (data) => startGame(data));
-      socket.on('world_joined', (data) => startGame(data));
-      socket.on('block_update', ({ x, y, type }) => {
-        const key = `${x},${y}`;
-        if (type === null) delete worldBlocks[key];
-        else worldBlocks[key] = type;
-      });
-      socket.on('player_joined', ({ username }) => {
-        addChatMessage({ username: 'Server', message: `${username} присоединился` });
-      });
-      socket.on('player_moved', ({ id, x, y }) => {
-        if (players[id]) { players[id].x = x; players[id].y = y; }
-      });
-      socket.on('player_left', ({ username }) => {
-        addChatMessage({ username: 'Server', message: `${username} вышел` });
-      });
-      socket.on('chat_message', (msg) => addChatMessage(msg));
-    }
-
+    function showError(msg) { authError.innerHTML = msg; setTimeout(() => authError.innerHTML = '', 3000); }
     function addChatMessage(msg) {
       chatMessages.push(msg);
       if (chatMessages.length > 20) chatMessages.shift();
-      updateChatDisplay();
-    }
-
-    function updateChatDisplay() {
-      chatBox.innerHTML = chatMessages.map(m => 
-        `<span style="color:#8bc34a">${m.username}:</span> ${m.message}`
-      ).join('<br>');
+      chatBox.innerHTML = chatMessages.map(m => `<span style="color:#8bc34a">${m.username}:</span> ${formatMinecraftText(m.message)}`).join('<br>');
       chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    // ---------- UI переключение ----------
-    function showMainMenu() {
-      authScreen.style.display = 'none';
-      mainMenu.style.display = 'flex';
-      createWorldScreen.style.display = 'none';
-      multiplayerScreen.style.display = 'none';
-      gameScreen.style.display = 'none';
-      settingsScreen.style.display = 'none';
-    }
-
-    function showCreateWorld() {
-      mainMenu.style.display = 'none';
-      createWorldScreen.style.display = 'block';
-    }
-
-    function showMultiplayer() {
-      mainMenu.style.display = 'none';
-      multiplayerScreen.style.display = 'block';
-      socket.emit('get_worlds');
-    }
-
-    function renderWorldsList(list) {
-      const container = document.getElementById('worldsList');
-      container.innerHTML = '';
-      if (list.length === 0) {
-        container.innerHTML = '<p>Нет доступных миров</p>';
-        return;
-      }
-      list.forEach(w => {
-        const div = document.createElement('div');
-        div.style.padding = '10px';
-        div.style.border = '2px solid #3a3a3a';
-        div.style.margin = '5px 0';
-        div.style.cursor = 'pointer';
-        div.innerHTML = `<strong>${w.name}</strong> (игроков: ${w.players}) [${w.settings.gameMode}]`;
-        div.onclick = () => {
-          socket.emit('join_world', { worldId: w.id });
-        };
-        container.appendChild(div);
+    // Socket
+    function connectSocket() {
+      socket = io();
+      socket.on('auth_success', ({ username }) => { currentUser = username; document.getElementById('displayUsername').textContent = username; showMainMenu(); });
+      socket.on('auth_error', showError);
+      socket.on('worlds_list', list => {
+        const div = document.getElementById('worldsList');
+        div.innerHTML = list.map(w => `<div style="padding:10px;border:2px solid #3a3a3a;margin:5px;cursor:pointer;" onclick="socket.emit('join_world',{worldId:'${w.id}'})"><strong>${formatMinecraftText(w.name)}</strong> (${w.players}) ${w.settings.gameMode}</div>`).join('');
       });
+      socket.on('world_created', data => startGame(data));
+      socket.on('world_data', data => {
+        worldBlocks = data.blocks;
+        players = data.players;
+        currentWorld = { worldId: data.worldId, worldName: data.worldName, settings: data.settings };
+        player.gamemode = data.settings.gameMode;
+        player.x = players[socket.id]?.x || 0;
+        player.y = players[socket.id]?.y || 70;
+        chatMessages = data.chatMessages || [];
+        chatBox.innerHTML = chatMessages.map(m => `<span style="color:#8bc34a">${m.username}:</span> ${formatMinecraftText(m.message)}`).join('<br>');
+        showGameScreen();
+      });
+      socket.on('player_joined', p => { players[p.id] = p; addChatMessage({username:'Server', message:`${p.username} зашёл`}); });
+      socket.on('player_left', p => { delete players[p.id]; addChatMessage({username:'Server', message:`${p.username} вышел`}); });
+      socket.on('player_moved', ({ id, x, y }) => { if (players[id]) { players[id].x = x; players[id].y = y; } });
+      socket.on('block_update', ({ x, y, type }) => { const key = `${x},${y}`; if (type === null) delete worldBlocks[key]; else worldBlocks[key] = type; });
+      socket.on('chat_message', addChatMessage);
     }
 
-    function startGame(worldData) {
-      currentWorld = worldData;
-      player.gameMode = worldData.settings.gameMode;
-      player.x = 0; player.y = 70;
-      players[socket.id] = { x: 0, y: 70, username: currentUser };
-      worldBlocks = {};
-      // Генерация начальных блоков (клиент запросит через сокет)
-      socket.emit('request_blocks', { worldId: currentWorld.worldId });
-      showGameScreen();
-      startGameLoop();
+    function showMainMenu() {
+      authScreen.style.display = 'none'; mainMenu.style.display = 'flex';
+      createWorldScreen.style.display = 'none'; multiplayerScreen.style.display = 'none'; gameScreen.style.display = 'none';
     }
-
+    function startGame(data) { /* ... вызов join_world или world_created приводит к world_data */ }
     function showGameScreen() {
-      mainMenu.style.display = 'none';
-      createWorldScreen.style.display = 'none';
-      multiplayerScreen.style.display = 'none';
-      gameScreen.style.display = 'block';
-      pauseMenu.style.display = 'none';
-      chatInput.style.display = 'none';
-      paused = false;
-      resizeCanvas();
-      window.addEventListener('resize', resizeCanvas);
+      mainMenu.style.display = 'none'; gameScreen.style.display = 'block'; pauseMenu.style.display = 'none';
+      resizeCanvas(); requestAnimationFrame(gameLoop);
+    }
+    function resizeCanvas() { canvas.width = gameScreen.clientWidth; canvas.height = gameScreen.clientHeight; }
+
+    // Физика и управление
+    function updatePlayer() {
+      if (paused) return;
+      const speed = 0.2, jumpForce = -5.5;
+      if (keys['KeyA']) player.vx = -speed;
+      else if (keys['KeyD']) player.vx = speed;
+      else player.vx *= 0.7;
+      if (keys['Space'] && player.onGround) player.vy = jumpForce;
+      player.vy += 0.3; player.y += player.vy;
+      player.x += player.vx;
+      // Коллизия
+      const footX = Math.floor(player.x), footY = Math.floor(player.y + 0.9);
+      player.onGround = !!worldBlocks[`${footX},${footY+1}`];
+      if (player.onGround && player.vy > 0) { player.y = footY; player.vy = 0; }
+      // Отправка на сервер
+      socket.emit('player_update', { x: player.x, y: player.y, health: player.health, hunger: player.hunger });
     }
 
-    function resizeCanvas() {
-      canvas.width = gameScreen.clientWidth;
-      canvas.height = gameScreen.clientHeight;
-    }
-
-    function togglePause() {
-      paused = !paused;
-      pauseMenu.style.display = paused ? 'block' : 'none';
-    }
-
-    // Отрисовка
     function draw() {
-      if (!canvas || !ctx) return;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const tileSize = 40;
       const camX = player.x * tileSize - canvas.width/2;
       const camY = player.y * tileSize - canvas.height/2;
-
       // Блоки
       for (let key in worldBlocks) {
         const [x, y] = key.split(',').map(Number);
-        const screenX = x * tileSize - camX;
-        const screenY = y * tileSize - camY;
-        if (worldBlocks[key] === 'grass') ctx.fillStyle = '#7c9c3e';
-        else if (worldBlocks[key] === 'stone') ctx.fillStyle = '#8a8a8a';
-        else ctx.fillStyle = '#5a5a5a';
-        ctx.fillRect(screenX, screenY, tileSize, tileSize);
-        // Обводка
-        ctx.strokeStyle = '#1a1a1a';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(screenX, screenY, tileSize, tileSize);
+        const sx = x * tileSize - camX, sy = y * tileSize - camY;
+        ctx.fillStyle = worldBlocks[key] === 'grass' ? '#7c9c3e' : worldBlocks[key] === 'dirt' ? '#8b5e3c' : '#6a6a6a';
+        ctx.fillRect(sx, sy, tileSize, tileSize);
+        ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2; ctx.strokeRect(sx, sy, tileSize, tileSize);
       }
-
       // Игроки
       for (let id in players) {
         const p = players[id];
-        const screenX = p.x * tileSize - camX;
-        const screenY = p.y * tileSize - camY;
+        const sx = p.x * tileSize - camX, sy = p.y * tileSize - camY;
         ctx.fillStyle = id === socket.id ? '#ff4a4a' : '#4a7aff';
-        ctx.fillRect(screenX, screenY, tileSize, tileSize);
-        ctx.fillStyle = 'white';
-        ctx.font = '14px Minecraft';
-        ctx.fillText(p.username, screenX, screenY-5);
+        ctx.fillRect(sx, sy, tileSize, tileSize);
+        ctx.fillStyle = 'white'; ctx.font = '14px Minecraft'; ctx.fillText(p.username, sx, sy-5);
       }
-
-      // HUD
       document.getElementById('healthDisplay').textContent = player.health;
       document.getElementById('hungerDisplay').textContent = player.hunger;
-      if (showDebug) {
-        debugInfo.style.display = 'block';
-        debugInfo.textContent = `XYZ: ${player.x.toFixed(1)} / ${player.y.toFixed(1)} | Мир: ${currentWorld?.worldName || ''}`;
-      } else {
-        debugInfo.style.display = 'none';
-      }
+      if (showDebug) { debugInfo.style.display = 'block'; debugInfo.textContent = `XYZ: ${player.x.toFixed(1)} ${player.y.toFixed(1)} | ${currentWorld?.worldName}`; }
+      else debugInfo.style.display = 'none';
     }
 
-    function gameLoop() {
-      if (!paused && currentWorld) {
-        // Физика (упрощённая)
-        if (keys['KeyA']) player.x -= 0.15;
-        if (keys['KeyD']) player.x += 0.15;
-        if (keys['Space'] && player.onGround) player.vy = -5;
-        player.vy += 0.3;
-        player.y += player.vy;
-        player.onGround = (player.y >= 70);
-        if (player.onGround) { player.y = 70; player.vy = 0; }
-        // Отправка позиции
-        socket.emit('player_move', { worldId: currentWorld.worldId, x: player.x, y: player.y });
-        draw();
-      }
-      requestAnimationFrame(gameLoop);
-    }
+    function gameLoop() { updatePlayer(); draw(); requestAnimationFrame(gameLoop); }
 
-    function startGameLoop() {
-      // Запускаем цикл через requestAnimationFrame
-      requestAnimationFrame(gameLoop);
-    }
-
-    // Обработчики клавиш
-    window.addEventListener('keydown', (e) => {
+    // События
+    window.addEventListener('keydown', e => {
       if (e.code === 'F3') { showDebug = !showDebug; e.preventDefault(); }
-      if (e.code === 'Escape' && currentWorld) { togglePause(); e.preventDefault(); }
-      if (e.code === 'KeyT' && currentWorld && !paused) {
-        chatOpen = true;
-        chatInput.style.display = 'block';
-        chatInput.focus();
-        e.preventDefault();
-      }
+      if (e.code === 'Escape' && currentWorld) { paused = !paused; pauseMenu.style.display = paused ? 'block' : 'none'; e.preventDefault(); }
+      if (e.code === 'KeyT' && currentWorld && !paused) { chatOpen = true; chatInput.style.display = 'block'; chatInput.focus(); e.preventDefault(); }
       if (e.code === 'Enter' && chatOpen) {
-        const msg = chatInput.value.trim();
-        if (msg) {
-          socket.emit('chat_message', { worldId: currentWorld.worldId, message: msg });
-        }
-        chatInput.value = '';
-        chatInput.style.display = 'none';
-        chatOpen = false;
-        e.preventDefault();
+        if (chatInput.value.trim()) socket.emit('chat_message', { message: chatInput.value });
+        chatInput.value = ''; chatInput.style.display = 'none'; chatOpen = false; e.preventDefault();
       }
       keys[e.code] = true;
     });
-    window.addEventListener('keyup', (e) => { keys[e.code] = false; });
-    window.addEventListener('mousedown', (e) => {
+    window.addEventListener('keyup', e => keys[e.code] = false);
+    canvas.addEventListener('mousedown', e => {
       if (!currentWorld || paused) return;
       const rect = canvas.getBoundingClientRect();
-      const tileSize = 40;
       const camX = player.x * tileSize - canvas.width/2;
       const camY = player.y * tileSize - canvas.height/2;
-      const worldX = Math.floor((e.clientX - rect.left + camX) / tileSize);
-      const worldY = Math.floor((e.clientY - rect.top + camY) / tileSize);
-      if (e.button === 0) { // ЛКМ - ломать
-        socket.emit('block_action', { worldId: currentWorld.worldId, x: worldX, y: worldY, action: 'break' });
-      } else if (e.button === 2) { // ПКМ - ставить
-        socket.emit('block_action', { worldId: currentWorld.worldId, x: worldX, y: worldY, action: 'place', blockType: 'stone' });
-      }
+      const wx = Math.floor((e.clientX - rect.left + camX) / tileSize);
+      const wy = Math.floor((e.clientY - rect.top + camY) / tileSize);
+      if (e.button === 0) socket.emit('block_action', { x: wx, y: wy, action: 'break' });
+      else if (e.button === 2) socket.emit('block_action', { x: wx, y: wy, action: 'place', blockType: 'stone' });
     });
     window.addEventListener('contextmenu', e => e.preventDefault());
 
-    // Привязка событий кнопок
+    // Кнопки
     document.getElementById('loginBtn').onclick = () => {
-      const u = document.getElementById('username').value.trim();
-      const p = document.getElementById('password').value;
-      if (!u || !p) return showError('Введите логин и пароль');
+      const u = document.getElementById('username').value, p = document.getElementById('password').value;
       fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u, password:p}) })
-        .then(r=>r.json())
-        .then(d=>{
-          if(d.success) {
-            socket.emit('auth', {username:u});
-          } else {
-            showError(d.error);
-          }
-        })
-        .catch(()=>showError('Ошибка соединения'));
+        .then(r=>r.json()).then(d=>{ if(d.success) socket.emit('auth',{username:u}); else showError(d.error); });
     };
     document.getElementById('registerBtn').onclick = () => {
-      const u = document.getElementById('username').value.trim();
-      const p = document.getElementById('password').value;
-      if (!u || !p) return showError('Введите логин и пароль');
+      const u = document.getElementById('username').value, p = document.getElementById('password').value;
       fetch('/api/register', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u, password:p}) })
-        .then(r=>r.json())
-        .then(d=>{
-          if(d.success) {
-            showError('Регистрация успешна! Теперь войдите.');
-          } else {
-            showError(d.error);
-          }
-        })
-        .catch(()=>showError('Ошибка соединения'));
+        .then(r=>r.json()).then(d=>{ if(d.success) showError('Успешно! Теперь войдите.'); else showError(d.error); });
     };
-    document.getElementById('singleplayerBtn').onclick = showCreateWorld;
-    document.getElementById('multiplayerBtn').onclick = showMultiplayer;
-    document.getElementById('settingsBtn').onclick = ()=>{
-      mainMenu.style.display = 'none';
-      settingsScreen.style.display = 'block';
-    };
-    document.getElementById('backFromSettings').onclick = showMainMenu;
+    document.getElementById('singleplayerBtn').onclick = () => { mainMenu.style.display = 'none'; createWorldScreen.style.display = 'block'; };
+    document.getElementById('multiplayerBtn').onclick = () => { mainMenu.style.display = 'none'; multiplayerScreen.style.display = 'block'; socket.emit('get_worlds'); };
     document.getElementById('backToMenuFromCreate').onclick = showMainMenu;
     document.getElementById('backToMenuFromMulti').onclick = showMainMenu;
-    document.getElementById('refreshWorlds').onclick = ()=> socket.emit('get_worlds');
-    document.getElementById('createWorldConfirm').onclick = ()=>{
+    document.getElementById('refreshWorlds').onclick = () => socket.emit('get_worlds');
+    document.getElementById('createWorldConfirm').onclick = () => {
       const name = document.getElementById('worldNameInput').value || 'Мир';
-      const gameMode = document.getElementById('gameModeSelect').value;
-      const difficulty = document.getElementById('difficultySelect').value;
-      const cheats = document.getElementById('cheatsCheckbox').checked;
-      const genType = document.getElementById('generationSelect').value;
-      socket.emit('create_world', { name, settings: { gameMode, difficulty, cheats, genType } });
+      const settings = { gameMode: document.getElementById('gameModeSelect').value, difficulty: document.getElementById('difficultySelect').value, cheats: document.getElementById('cheatsCheckbox').checked };
+      socket.emit('create_world', { name, settings });
     };
-    document.getElementById('resumeBtn').onclick = togglePause;
-    document.getElementById('saveAndQuitBtn').onclick = ()=>{
-      paused = false;
-      currentWorld = null;
-      gameScreen.style.display = 'none';
-      showMainMenu();
-    };
-    document.getElementById('openToLanBtn').onclick = ()=>{
-      alert(`Мир открыт по сети! Другие игроки могут подключиться через "Сетевая игра"`);
-    };
-
-    // Запуск
-    connectSocket();
+    document.getElementById('resumeBtn').onclick = () => { paused = false; pauseMenu.style.display = 'none'; };
+    document.getElementById('saveAndQuitBtn').onclick = () => { location.reload(); };
+    document.getElementById('openToLanBtn').onclick = () => alert('Мир уже открыт по сети!');
+    document.getElementById('backFromSettings').onclick = showMainMenu;
+    document.getElementById('settingsBtn').onclick = () => { mainMenu.style.display = 'none'; settingsScreen.style.display = 'block'; };
+    window.onload = connectSocket;
   })();
 </script>
 </body>

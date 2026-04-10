@@ -3,124 +3,88 @@ const http = require('http');
 const socketIo = require('socket.io');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
-
 const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(express.static('public'));
 app.use(express.json());
 
-// === Настройка папки данных (обязательно для Render) ===
+// Папка данных
 const DATA_DIR = path.join(__dirname, 'data');
-try {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-    console.log('Папка data создана');
-  }
-} catch (err) {
-  console.error('Не удалось создать папку data:', err);
-}
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const WORLDS_FILE = path.join(DATA_DIR, 'worlds.json');
 
-// Загрузка данных с защитой от ошибок
 let users = {};
 let worlds = {};
 
 try {
-  if (fs.existsSync(USERS_FILE)) {
-    users = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
-    console.log('Загружено пользователей:', Object.keys(users).length);
-  } else {
-    fs.writeFileSync(USERS_FILE, '{}');
-  }
-} catch (e) {
-  console.error('Ошибка загрузки users.json:', e);
-  users = {};
-}
+  if (fs.existsSync(USERS_FILE)) users = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+  else fs.writeFileSync(USERS_FILE, '{}');
+  if (fs.existsSync(WORLDS_FILE)) worlds = JSON.parse(fs.readFileSync(WORLDS_FILE, 'utf8'));
+  else fs.writeFileSync(WORLDS_FILE, '{}');
+} catch (e) { console.error(e); }
 
-try {
-  if (fs.existsSync(WORLDS_FILE)) {
-    worlds = JSON.parse(fs.readFileSync(WORLDS_FILE, 'utf8'));
-  } else {
-    fs.writeFileSync(WORLDS_FILE, '{}');
-  }
-} catch (e) {
-  console.error('Ошибка загрузки worlds.json:', e);
-  worlds = {};
-}
+function saveUsers() { fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2)); }
+function saveWorlds() { fs.writeFileSync(WORLDS_FILE, JSON.stringify(worlds, null, 2)); }
 
-function saveUsers() {
-  try {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-  } catch (e) {
-    console.error('Ошибка сохранения users.json:', e);
-  }
-}
-
-function saveWorlds() {
-  try {
-    fs.writeFileSync(WORLDS_FILE, JSON.stringify(worlds, null, 2));
-  } catch (e) {
-    console.error('Ошибка сохранения worlds.json:', e);
-  }
-}
-
-// API регистрации и входа
+// API
 app.post('/api/register', (req, res) => {
   const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password required' });
-  }
-  if (users[username]) {
-    return res.status(400).json({ error: 'User already exists' });
-  }
+  if (!username || !password) return res.status(400).json({ error: 'Логин и пароль обязательны' });
+  if (users[username]) return res.status(400).json({ error: 'Пользователь уже существует' });
   users[username] = { password, createdAt: new Date().toISOString() };
   saveUsers();
-  console.log(`Зарегистрирован новый пользователь: ${username}`);
   res.json({ success: true });
 });
 
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
   const user = users[username];
-  if (!user || user.password !== password) {
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
+  if (!user || user.password !== password) return res.status(401).json({ error: 'Неверные данные' });
   res.json({ success: true });
 });
 
-// === Socket.IO логика ===
-const activeWorlds = {};
+// Генерация мира (простой шум)
+function generateChunk(worldId, chunkX, chunkY) {
+  const seed = worldId.split('').reduce((a,b)=>a+b.charCodeAt(0),0);
+  const blocks = {};
+  const size = 16;
+  for (let x = 0; x < size; x++) {
+    for (let y = 0; y < size; y++) {
+      const wx = chunkX * size + x;
+      const wy = chunkY * size + y;
+      const noise = Math.sin(wx * 0.1 + seed) * Math.cos(wy * 0.1 + seed) * 5;
+      const groundHeight = 64 + Math.floor(noise);
+      if (wy < groundHeight - 3) blocks[`${wx},${wy}`] = 'stone';
+      else if (wy < groundHeight) blocks[`${wx},${wy}`] = 'dirt';
+      else if (wy === groundHeight) blocks[`${wx},${wy}`] = 'grass';
+      if (wy > 70 && wy < 80 && Math.random() < 0.01) blocks[`${wx},${wy}`] = 'stone'; // руда
+    }
+  }
+  return blocks;
+}
 
-// Восстановление миров из файла
-Object.entries(worlds).forEach(([id, world]) => {
+// Активные миры
+const activeWorlds = {};
+Object.entries(worlds).forEach(([id, data]) => {
   activeWorlds[id] = {
-    id,
-    name: world.name,
-    settings: world.settings,
-    blocks: world.blocks || {},
+    id, name: data.name, settings: data.settings,
+    blocks: data.blocks || {},
     players: {},
-    chatMessages: world.chatMessages || [],
+    chatMessages: data.chatMessages || [],
+    seed: id,
   };
 });
 
 function createWorld(owner, name, settings) {
-  const id = Date.now() + '-' + Math.random().toString(36).substr(2, 5);
-  const world = {
-    id,
-    name,
-    settings,
-    blocks: {},
-    players: {},
-    chatMessages: [],
-    owner,
-  };
+  const id = Date.now() + '-' + crypto.randomBytes(3).toString('hex');
+  const world = { id, name, settings, blocks: {}, players: {}, chatMessages: [], owner };
   activeWorlds[id] = world;
   worlds[id] = { name, settings, blocks: world.blocks, chatMessages: [] };
   saveWorlds();
@@ -128,104 +92,120 @@ function createWorld(owner, name, settings) {
 }
 
 function saveWorldState(worldId) {
-  const world = activeWorlds[worldId];
-  if (!world) return;
-  worlds[worldId] = {
-    name: world.name,
-    settings: world.settings,
-    blocks: world.blocks,
-    chatMessages: world.chatMessages,
-  };
+  const w = activeWorlds[worldId];
+  if (!w) return;
+  worlds[worldId] = { name: w.name, settings: w.settings, blocks: w.blocks, chatMessages: w.chatMessages };
   saveWorlds();
 }
 
+// Socket.IO
 io.on('connection', (socket) => {
-  console.log('Новое подключение:', socket.id);
+  console.log('🟢 Подключение:', socket.id);
+  let currentUsername = null;
+  let currentWorldId = null;
 
   socket.on('auth', ({ username }) => {
-    if (!users[username]) {
-      socket.emit('auth_error', 'User not found');
-      return;
-    }
-    socket.username = username;
+    if (!users[username]) return socket.emit('auth_error', 'Пользователь не найден');
+    currentUsername = username;
     socket.emit('auth_success', { username });
   });
 
   socket.on('get_worlds', () => {
     const list = Object.values(activeWorlds).map(w => ({
-      id: w.id,
-      name: w.name,
-      players: Object.keys(w.players).length,
-      settings: w.settings,
+      id: w.id, name: w.name, players: Object.keys(w.players).length, settings: w.settings
     }));
     socket.emit('worlds_list', list);
   });
 
   socket.on('create_world', ({ name, settings }) => {
-    if (!socket.username) return;
-    const world = createWorld(socket.username, name, settings);
+    if (!currentUsername) return;
+    const world = createWorld(currentUsername, name, settings);
     socket.join(world.id);
-    world.players[socket.id] = { username: socket.username, x: 0, y: 70, mode: settings.gameMode };
+    currentWorldId = world.id;
+    world.players[socket.id] = { username: currentUsername, x: 0, y: 70, health: 20, hunger: 20, gamemode: settings.gameMode };
     socket.emit('world_created', { worldId: world.id, worldName: world.name, settings: world.settings });
   });
 
   socket.on('join_world', ({ worldId }) => {
-    if (!socket.username) return;
+    if (!currentUsername) return;
     const world = activeWorlds[worldId];
-    if (!world) return;
+    if (!world) return socket.emit('error', 'Мир не найден');
     socket.join(worldId);
-    world.players[socket.id] = { username: socket.username, x: 0, y: 70, mode: world.settings.gameMode };
-    socket.emit('world_joined', { worldId, worldName: world.name, settings: world.settings });
-    socket.to(worldId).emit('player_joined', { username: socket.username });
+    currentWorldId = worldId;
+    world.players[socket.id] = { username: currentUsername, x: 0, y: 70, health: 20, hunger: 20, gamemode: world.settings.gameMode };
+    // Отправляем игроку данные мира
+    const nearbyBlocks = {};
+    for (let cx = -2; cx <= 2; cx++) {
+      for (let cy = -2; cy <= 2; cy++) {
+        Object.assign(nearbyBlocks, generateChunk(worldId, cx, cy));
+      }
+    }
+    Object.assign(world.blocks, nearbyBlocks);
+    socket.emit('world_data', {
+      blocks: nearbyBlocks,
+      players: world.players,
+      chatMessages: world.chatMessages,
+      worldName: world.name,
+      settings: world.settings,
+    });
+    socket.to(worldId).emit('player_joined', { id: socket.id, username: currentUsername, x: 0, y: 70 });
+    saveWorldState(worldId);
   });
 
-  socket.on('block_action', ({ worldId, x, y, action, blockType }) => {
-    const world = activeWorlds[worldId];
+  socket.on('request_chunk', ({ chunkX, chunkY }) => {
+    if (!currentWorldId) return;
+    const world = activeWorlds[currentWorldId];
+    if (!world) return;
+    const blocks = generateChunk(currentWorldId, chunkX, chunkY);
+    Object.assign(world.blocks, blocks);
+    socket.emit('chunk_data', { chunkX, chunkY, blocks });
+    saveWorldState(currentWorldId);
+  });
+
+  socket.on('player_update', (data) => {
+    if (!currentWorldId) return;
+    const world = activeWorlds[currentWorldId];
+    if (!world || !world.players[socket.id]) return;
+    const player = world.players[socket.id];
+    player.x = data.x; player.y = data.y; player.health = data.health; player.hunger = data.hunger;
+    socket.to(currentWorldId).emit('player_moved', { id: socket.id, x: data.x, y: data.y });
+  });
+
+  socket.on('block_action', ({ x, y, action, blockType }) => {
+    if (!currentWorldId) return;
+    const world = activeWorlds[currentWorldId];
     if (!world) return;
     const key = `${x},${y}`;
-    if (action === 'break') {
-      delete world.blocks[key];
-    } else if (action === 'place') {
-      world.blocks[key] = blockType || 'stone';
-    }
-    io.to(worldId).emit('block_update', { x, y, type: action === 'break' ? null : world.blocks[key] });
-    saveWorldState(worldId);
+    if (action === 'break') delete world.blocks[key];
+    else world.blocks[key] = blockType || 'stone';
+    io.to(currentWorldId).emit('block_update', { x, y, type: action === 'break' ? null : world.blocks[key] });
+    saveWorldState(currentWorldId);
   });
 
-  socket.on('player_move', ({ worldId, x, y }) => {
-    const world = activeWorlds[worldId];
+  socket.on('chat_message', ({ message }) => {
+    if (!currentWorldId || !currentUsername) return;
+    const world = activeWorlds[currentWorldId];
     if (!world) return;
-    const player = world.players[socket.id];
-    if (player) {
-      player.x = x;
-      player.y = y;
-      socket.to(worldId).emit('player_moved', { id: socket.id, x, y });
-    }
-  });
-
-  socket.on('chat_message', ({ worldId, message }) => {
-    const world = activeWorlds[worldId];
-    if (!world || !socket.username) return;
-    const chatMsg = { username: socket.username, message, timestamp: Date.now() };
-    world.chatMessages.push(chatMsg);
+    const msg = { username: currentUsername, message, timestamp: Date.now() };
+    world.chatMessages.push(msg);
     if (world.chatMessages.length > 50) world.chatMessages.shift();
-    io.to(worldId).emit('chat_message', chatMsg);
-    saveWorldState(worldId);
+    io.to(currentWorldId).emit('chat_message', msg);
+    saveWorldState(currentWorldId);
   });
 
   socket.on('disconnect', () => {
-    if (!socket.username) return;
-    for (const worldId in activeWorlds) {
-      const world = activeWorlds[worldId];
-      if (world.players[socket.id]) {
+    if (currentWorldId && currentUsername) {
+      const world = activeWorlds[currentWorldId];
+      if (world) {
         delete world.players[socket.id];
-        socket.to(worldId).emit('player_left', { username: socket.username });
-        break;
+        io.to(currentWorldId).emit('player_left', { id: socket.id, username: currentUsername });
+        if (Object.keys(world.players).length === 0) {
+          // Можно удалить пустой мир, но пока оставим
+        }
+        saveWorldState(currentWorldId);
       }
     }
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`✅ Сервер Gotcraft запущен на порту ${PORT}`);
-});
+server.listen(PORT, () => console.log(`🚀 Gotcraft server running on port ${PORT}`));
